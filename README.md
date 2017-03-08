@@ -1,7 +1,7 @@
 # tarpit-rs: Smallfuck implemented in Rust's type system
 
 This is a proof of the Turing-completeness of Rust's type system; it's an
-implementation of (Smallfuck)[https://esolangs.org/wiki/Smallfuck], a known
+implementation of [Smallfuck](https://esolangs.org/wiki/Smallfuck), a known
 Turing complete language. Since Rust's type system may have a Turing-complete
 language embedded in it, we know therefore it must be Turing-complete itself!
 Neat.
