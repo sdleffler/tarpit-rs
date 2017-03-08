@@ -1,0 +1,8 @@
+[package]
+authors = ["Sean Leffler <sean@errno.com>"]
+name = "tarpit"
+version = "0.1.0"
+
+[dependencies]
+bit-vec = "0.4.3"
+type-operators = "0.3.5"
