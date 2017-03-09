@@ -236,7 +236,7 @@ macro_rules! sf {
     (< $($prog:tt)*) => { Left<sf!($($prog)*)> };
     (> $($prog:tt)*) => { Right<sf!($($prog)*)> };
     (* $($prog:tt)*) => { Flip<sf!($($prog)*)> };
-    ([$($prog:tt)*]) => { Loop<sf!($($prog)*)> };
+    ([$($inside:tt)*] $($outside:tt)*) => { Loop<sf!($($inside)*), sf!($($outside)*)> };
     () => { Empty };
 }
 
@@ -276,6 +276,6 @@ sf_test! {
         > * > * > * [ * < ]
     }
     forth_and_back {
-        < * < * < * [ * > ]
+        < * < * < * [ * > ] > > >
     }
 }
