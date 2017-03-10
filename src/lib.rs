@@ -35,7 +35,7 @@ pub enum Program {
 // implementation. We keep track of every bit in the type-level implementation,
 // so here we use a `BitVec` rather than a sparse representation.
 #[derive(Debug)]
-pub struct State {
+pub struct StateTyOut {
     loc: usize,
     bits: BitVec,
 }
@@ -48,66 +48,37 @@ pub struct State {
 // we use a `HashMap` which allows us to map `isize` to `bool`
 // without much fanfare, efficiency, or effort.
 #[derive(Debug)]
-pub struct SparseState {
-    loc: isize,
-    bits: HashMap<isize, bool>,
+pub struct State {
+    ptr: u16,
+    bits: [u8; std::u16::MAX as usize / 8],
+}
+
+
+impl State {
+    fn get_current_bit(&self) -> bool {
+        self.bits[self.ptr / 8] & (0x1 << (self.ptr % 8)) != 0
+    }
+
+    fn flip_current_bit(&mut self) {
+        self.bits[self.ptr / 8] ^= (0x1 << (self.ptr % 8));
+    }
 }
 
 
 impl Program {
-    // A "big step" here completely executes a Smallfuck program with respect to
-    // some given state.
-    fn big_step(&self, state: &mut SparseState) {
-        use self::Program::*;
-
+    fn big_step(&self, state: &mut State) {
         match *self {
-            Empty => {
-                // No modifications to the program; stop recursing. We're done.
-            }
+            Empty => {},
             Left(ref next) => {
-                // Pointer decrement.
-                state.loc -= 1;
-                println!("< | pointer from {} to {}. {:?}",
-                         state.loc + 1,
-                         state.loc,
-                         state);
-                // We're done. Next instruction! Since we're representing our
-                // program with an AST-like format, we'll keep going using
-                // recursion.
+                state.ptr = state.ptr.wrapping_sub(1);
                 next.big_step(state);
-            }
+            },
             Right(ref next) => {
-                // Pointer increment.
-                state.loc += 1;
+                state.ptr = state.ptr.wrapping_add(1);
                 next.big_step(state);
-            }
-            Flip(ref next) => {
-                // Flip the bit at the pointer.
-                {
-                    // We're working with a `HashMap`; thus, an entry might not
-                    // exist. So, we insert `false` if it's not.
-                    let cell = state.bits.entry(state.loc).or_insert(false);
-                    *cell = !*cell;
-                }
-                next.big_step(state);
-            }
-            Loop(ref boxed) => {
-                // Loop - the most complex instruction. We check the bit at the
-                // pointer. If it's zero (`false`), we continue; if it's one
-                // (`true`), then we run the body of the loop again.
-                let &(ref block, ref next) = boxed.as_ref();
-                if *state.bits.get(&state.loc).unwrap_or(&false) {
-                    // Case 1: zero - run the loop body.
-                    block.big_step(state);
-                    // Looping means we re-check. Note that we're *recursing*
-                    // here, with the exact same program we started with, *but*
-                    // a different state.
-                    self.big_step(state);
-                } else {
-                    // Case 2: one - we continue onwards.
-                    next.big_step(state);
-                }
-            }
+            },
+            Flip(ref next) => ...,
+            Loop(ref body_and_next) => ...,
         }
     }
 
@@ -172,14 +143,14 @@ type_operators! {
     // `StateTy` is the type-level representation of the state of the Smallfuck
     // interpreter. It's a zipper list, so we've got a left-list, `L` - our
     // current bit, `C` - and our right-list, `R`.
-    concrete StateTy => State {
+    concrete StateTy => StateTyOut {
         St(L: List, C: Bit, R: List) => {
             let mut bits = L;
             let loc = bits.len();
             bits.push(C);
             bits.extend(R.into_iter().rev());
 
-            State {
+            StateTyOut {
                 loc: loc,
                 bits: bits,
             }
