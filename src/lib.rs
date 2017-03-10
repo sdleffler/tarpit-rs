@@ -31,9 +31,9 @@ pub enum Program {
 }
 
 
-// This is the `State` object output by `reify`ing the output of the type-level
-// implementation. We keep track of every bit in the type-level implementation,
-// so here we use a `BitVec` rather than a sparse representation.
+// This is the type output by `reify`ing the type-level `StateTy` representation.
+// We keep track of every bit in the type-level implementation, so here we use a
+// `BitVec` rather than a sparse representation.
 #[derive(Debug)]
 pub struct StateTyOut {
     loc: usize,
@@ -43,52 +43,68 @@ pub struct StateTyOut {
 
 // The type-level implementation uses a zipper list, which means it doesn't have
 // to keep track of the pointer. However, in our runtime version, it'd be very
-// irritating if the pointer couldn't go negative. (I'm realizing now I could
-// have just let it wrap around, but screwit, I'm not gonna rewrite this.) So
-// we use a `HashMap` which allows us to map `isize` to `bool`
-// without much fanfare, efficiency, or effort.
-#[derive(Debug)]
+// irritating if we had to deal with the pointer going negative. So here we make
+// an approximation and use a finite type instead. This is okay because the
+// runtime implementation is only used to check the correctness of the type-level
+// implementation.
 pub struct State {
     ptr: u16,
-    bits: [u8; std::u16::MAX as usize / 8],
+    bits: [u8; (std::u16::MAX as usize + 1) / 8],
 }
 
 
 impl State {
+    fn get_bit(&self, at: u16) -> bool {
+        self.bits[(at / 8) as usize] & (0x1 << (at & 0x7)) != 0
+    }
+
     fn get_current_bit(&self) -> bool {
-        self.bits[self.ptr / 8] & (0x1 << (self.ptr % 8)) != 0
+        self.get_bit(self.ptr)
     }
 
     fn flip_current_bit(&mut self) {
-        self.bits[self.ptr / 8] ^= (0x1 << (self.ptr % 8));
+        self.bits[(self.ptr / 8) as usize] ^= 0x1 << (self.ptr & 0x7);
     }
 }
 
 
 impl Program {
     fn big_step(&self, state: &mut State) {
+        use self::Program::*;
+
         match *self {
-            Empty => {},
+            Empty => {}
             Left(ref next) => {
                 state.ptr = state.ptr.wrapping_sub(1);
                 next.big_step(state);
-            },
+            }
             Right(ref next) => {
                 state.ptr = state.ptr.wrapping_add(1);
                 next.big_step(state);
-            },
-            Flip(ref next) => ...,
-            Loop(ref body_and_next) => ...,
+            }
+            Flip(ref next) => {
+                state.flip_current_bit();
+                next.big_step(state);
+            }
+            Loop(ref body_and_next) => {
+                let &(ref body, ref next) = body_and_next.as_ref();
+                if state.get_current_bit() {
+                    body.big_step(state);
+                    self.big_step(state);
+                } else {
+                    next.big_step(state);
+                }
+            }
         }
     }
 
 
     // Convenience function to run a program without having to write out the
     // state allocation boilerplate.
-    fn run(&self) -> SparseState {
-        let mut state: SparseState = SparseState {
-            loc: 0,
-            bits: HashMap::new(),
+    fn run(&self) -> State {
+        let mut state: State = State {
+            ptr: 0,
+            bits: [0; (std::u16::MAX as usize + 1) / 8],
         };
 
         self.big_step(&mut state);
@@ -224,12 +240,11 @@ macro_rules! sf_test {
 
                 println!("Program: {:?}", prog);
                 println!("Type-level output: {:?}", typelevel_out);
-                println!("Runtime output: {:?}", runtime_out);
 
-                let offset = runtime_out.loc - (typelevel_out.loc as isize);
+                let offset = runtime_out.ptr.wrapping_sub(typelevel_out.loc as u16);
 
                 for (i, b1) in typelevel_out.bits.into_iter().enumerate() {
-                    let b2 = *runtime_out.bits.get(&(i as isize + offset)).unwrap_or(&false);
+                    let b2 = runtime_out.get_bit((i as u16).wrapping_add(offset));
                     println!("[{}] {} == {}",
                             i,
                             if b1 { "1" } else { "0" },
@@ -244,9 +259,9 @@ macro_rules! sf_test {
 
 sf_test! {
     back_and_forth {
-        > * > * > * [ * < ]
+        > * > * > * > * < [ * < ]
     }
     forth_and_back {
-        < * < * < * [ * > ] > > >
+        < * < * < * < * > [ * > ] > > >
     }
 }
