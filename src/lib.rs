@@ -4,8 +4,6 @@ extern crate bit_vec;
 extern crate type_operators;
 
 
-use std::collections::HashMap;
-
 use bit_vec::BitVec;
 
 
