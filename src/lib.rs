@@ -99,7 +99,7 @@ impl Program {
 
     // Convenience function to run a program without having to write out the
     // state allocation boilerplate.
-    fn run(&self) -> State {
+    pub fn run(&self) -> State {
         let mut state: State = State {
             ptr: 0,
             bits: [0; (std::u16::MAX as usize + 1) / 8],
