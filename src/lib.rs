@@ -87,7 +87,7 @@ impl Program {
                 next.big_step(state);
             }
             Loop(ref body_and_next) => {
-                let &(ref body, ref next) = body_and_next.as_ref();
+                let (ref body, ref next) = **body_and_next;
                 if state.get_current_bit() {
                     body.big_step(state);
                     self.big_step(state);
