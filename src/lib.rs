@@ -4,8 +4,6 @@ extern crate bit_vec;
 extern crate type_operators;
 
 
-use std::collections::HashMap;
-
 use bit_vec::BitVec;
 
 
@@ -87,7 +85,7 @@ impl Program {
                 next.big_step(state);
             }
             Loop(ref body_and_next) => {
-                let &(ref body, ref next) = body_and_next.as_ref();
+                let (ref body, ref next) = **body_and_next;
                 if state.get_current_bit() {
                     body.big_step(state);
                     self.big_step(state);
@@ -101,7 +99,7 @@ impl Program {
 
     // Convenience function to run a program without having to write out the
     // state allocation boilerplate.
-    fn run(&self) -> State {
+    pub fn run(&self) -> State {
         let mut state: State = State {
             ptr: 0,
             bits: [0; (std::u16::MAX as usize + 1) / 8],
